@@ -8,11 +8,16 @@ const openai = new OpenAI({
 
 export async function POST(req: NextRequest) {
   const { prompt, previous_response_id } = await req.json();
+  const vevctorStoreId = String(process.env.VECTOR_STORE_ID);
   try {
     const response = await openai.responses.create({
       model: 'o4-mini-2025-04-16',
       instructions: systemPrompt,
       input: prompt,
+      tools: [{
+        type: "file_search",
+        vector_store_ids: [vevctorStoreId],
+    }],
       previous_response_id: previous_response_id ?? undefined,
     });
 
