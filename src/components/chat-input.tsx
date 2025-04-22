@@ -1,27 +1,50 @@
-"use client"
-import { useState } from "react"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
+"use client";
+import { useState } from "react";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 
-export function ChatInput({ onSend }: { onSend: (message: string) => void }) {
-  const [value, setValue] = useState("")
+export function ChatInput({
+  onSend,
+  disabled = false,
+}: {
+  onSend: (message: string) => void;
+  disabled?: boolean;
+}) {
+  const [input, setInput] = useState("");
 
-  const handleSend = () => {
-    if (!value.trim()) return
-    onSend(value)
-    setValue("")
-  }
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (!disabled && input.trim()) {
+        onSend(input);
+        setInput("");
+      }
+    }
+  };
 
   return (
     <div className="flex items-center gap-2 mt-4">
-      <Input
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && handleSend()}
-        placeholder="CASA に関する質問をどうぞ"
-        className="flex-grow"
+      <Textarea
+        rows={1}
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder={disabled ? "Please wait..." : "Ask me questions on CASA"}
+        className="flex-grow text-2xl p-2 leading-tight resize-none max-h-100 overflow-y-auto"
+        disabled={disabled}
       />
-      <Button onClick={handleSend}>送信</Button>
+      <Button
+        onClick={() => {
+          if (!disabled && input.trim()) {
+            onSend(input);
+            setInput("");
+          }
+        }}
+        disabled={disabled}
+        className="disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Submit
+      </Button>
     </div>
-  )
+  );
 }
