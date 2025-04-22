@@ -12,7 +12,9 @@ Docs of CASA & analysisUtils enhanced ChatGPT.
 
 2. Clone this repository.
 
-3. Install dependencies:
+3. create `.env` or `.env.local` and write down your `OPENAI_API_KEY` and `VECTOR_STORE_ID` of the docs. You can get the docs from me (sorry but basically my reseachmate only).
+
+4. Install dependencies:
 
 ```bash
 [npm/yarn/pnpm] install
@@ -20,7 +22,7 @@ Docs of CASA & analysisUtils enhanced ChatGPT.
 
 (Choose one of the package managers you use.)
 
-4. Run the app:
+5. Run the app:
 
 `npm`:
 
@@ -34,6 +36,6 @@ npm run dev
 [yarn/pnpm] dev
 ```
 
-5. Access the app at [http://localhost:3000](http://localhost:3000).
+6. Access the app at [http://localhost:3000](http://localhost:3000).
 
-6. When you quit the app, just press `Ctrl + C` in the terminal.
+7. When you quit the app, just press `Ctrl + C` in the terminal.
