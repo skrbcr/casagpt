@@ -3,9 +3,9 @@ import Link from "next/link";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider"
 import { ModeToggle } from "@/components/mode-toggle";
-import { auth } from "@/auth";
-import SignIn from "@/components/sign-in";
-import SignOut from "@/components/sign-out";
+import LogOut from "@/components/log-out";
+import LogIn from "@/components/log-in";
+import { createClient } from "@/utils/supabase/server";
 
 export const metadata: Metadata = {
   title: "ChatGPT for CASA",
@@ -17,7 +17,9 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const session = await auth();
+  const supabase = await createClient();
+  const { data: authData } = await supabase.auth.getUser();
+
   return (
     <>
       <html lang="en" suppressHydrationWarning>
@@ -40,10 +42,10 @@ export default async function RootLayout({
                 <div className="mx-4">
                   <Link href="/about" className="text-base hover:underline">About</Link>
                 </div>
-                {session?.user ? (
-                  <SignOut />
+                {authData?.user ? (
+                  <LogOut />
                 ) : (
-                  <SignIn />
+                  <LogIn />
                 )}
                 <ModeToggle />
               </div>

@@ -1,14 +1,23 @@
-import { login, signup } from './actions'
+import { login } from '@/lib/auth-actions'
+import { redirect } from 'next/navigation'
+import { createClient } from '@/utils/supabase/server'
 
-export default function LoginPage() {
+import Main from '@/components/main'
+import AuthForm from '@/components/auth-form'
+
+export default async function LoginPage() {
+  const supabase = await createClient()
+
+  const { data: authData } = await supabase.auth.getUser()
+  if (authData?.user) {
+    redirect('/')
+  }
+
   return (
-    <form className='mt-18'>
-      <label htmlFor="email">Email:</label>
-      <input id="email" name="email" type="email" required />
-      <label htmlFor="password">Password:</label>
-      <input id="password" name="password" type="password" required />
-      <button formAction={login}>Log in</button>
-      <button formAction={signup}>Sign up</button>
-    </form>
+    <Main>
+      <div className='flex flex-col items-center justify-center h-screen'>
+        <AuthForm title='Login' formAction={login}/>
+      </div>
+    </Main>
   )
 }

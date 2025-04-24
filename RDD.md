@@ -21,6 +21,7 @@
 #### ログインユーザ
 
 - オーナーにより Supabase 上で作成されたアカウント
+- メールアドレスとパスワードでログイン
 - 認証後に自身の会話（`threads`）を作成・編集・共有可能
 
 #### 全ユーザ
@@ -28,78 +29,154 @@
 - アカウントの有無に関わらずアクセス可能
 - 共有された会話（`is_shared = true`）に限り、読み取り専用で閲覧可能
 
+### threads & messages
+
+- threads：一連の会話をまとめたもの
+    - ユーザは作成、削除が可能
+    - account が削除された場合、関連する threads も削除される
+- messages：スレッド内のメッセージ
+    - ユーザは作成が可能
+    - threads が削除された場合、関連する messages も削除される
+
 ---
 
-### 認証・認可フロー
+### データベース設計
 
-| ステップ | 処理 | トークン | 備考 |
-| ---- | ---- | ---- | ---- |
-| 1 | ユーザは Auth0 でログイン（Auth.js の /api/auth/login） | Auth0 ID ／ Access Token | 既存実装 |
-| 2 | Auth.js afterCallback で Auth0 の `id_token.sub` を取り出し、 Supabase JWT を RS256 → HS256 で再署名 | `session.user.accessToken` に保存 | Supabase JWT の署名鍵=`SUPABASE_JWT_SECRET` |
-| 3 | Next.js API ルート／Server Actions から Supabase にアクセスする際、 `createClient(url, anonKey, { global: { headers:{ Authorization: 'Bearer ' + accessToken }}})` で接続 | Supabase は JWT 内 `userId` クレームで本人確認 |
-| 4 | RLS が JWT の `userId` を基に 行レベル判定 | ― | 共有閲覧は anon ロール（トークン無し）データ構造 |
+#### テーブル：`profiles`
 
+| `列` | `型` | `説明` |
+|----|----|-----|
+| `id` | `uuid` | |
+| `user_id` | `uuid` | Supabase の `auth.users` テーブルの ID |
+| `email` | `text` | ユーザのメールアドレス |
+| `created_at` | `timestamp` default `now()` | |
 
-#### テーブル：`users`
+```sql
+create table profiles (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users,
+  email text not null,
+  created_at timestamp default now()
+);
 
-| `名前`         | `型`       | `内容`                          |
-| ---------- | ------- | --------------------------- |
-| `id`  | `uuid` | Supabase のユーザー ID（auth.uid） |
-| `email`      | `text`    | メールアドレス                     |
-| `created_at` | `timestamp` | default `now()`  |
+alter table profiles enable row level security;
+alter table profiles add constraint unique_user_id unique(user_id);
 
-> Auth0 から Actions または Webhook で `INSERT … ON CONFLICT DO NOTHING` を行う。
+create policy "Users can view their own profiles"
+on profiles for select
+using ( (select auth.uid()) = user_id );
+
+create policy "Users can create a profile."
+on profiles for insert
+to authenticated
+with check ( (select auth.uid()) = user_id );
+
+create policy "Users can update their own profile."
+on profiles for update
+to authenticated
+using ( (select auth.uid()) = user_id )
+with check ( (select auth.uid()) = user_id );
+
+create policy "Users can delete their own profile."
+on profiles for delete
+to authenticated
+using ( (select auth.uid()) = user_id );
+```
 
 #### テーブル：`threads`
 
 | `列` | `型` | `説明` |
 |----|----|-----|
-| `id` | `uuid` PK `gen_random_uuid()` | URL `?c=<id>` で使用 |
-| `user_id` | `text` FK → `accounts.auth0_sub` | スレッド所有者 |
-| `title` | `text` | 任意タイトル |
-| `is_shared` | `boolean` default `false` | 共有フラグ |
+| `id` | `uuid` default `gen_random_uuid()` | URL `?c=<id>` で使用 |
+| `user_id` | `uuid` | スレッドを作成したユーザの ID |
+| `title` | `text` | ユーザが入力したタイトル |
+| `is_shared` | `bool` default `false` | 共有フラグ |
 | `created_at` | `timestamp` default `now()` | |
+
+```sql
+create table threads (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references profiles(id) on delete cascade,
+  title text not null,
+  is_shared boolean not null default false,
+  created_at timestamp default now()
+);
+
+alter table "threads" enable row level security;
+
+create policy "Users can view their own threads"
+on threads for select
+using ( (select auth.uid()) = user_id );
+
+create policy "Anyone can view shared threads"
+on threads for select
+to authenticated, anon
+using ( is_shared = true );
+
+create policy "Users can create a thread"
+on threads for insert
+to authenticated
+with check ( (select auth.uid()) = user_id );
+```
 
 #### テーブル：`messages`
 
 | `列` | `型` | `説明` |
 |----|----|-----|
 | `id` | `uuid` PK | |
+| `user_id` | `uuid` | メッセージを作成したユーザの ID |
 | `thread_id` | `uuid` FK → `threads.id` | |
 | `role` | `text` CHECK (`role IN ('user','ai')`) | |
 | `content` | `text` | メッセージ本文 |
 | `created_at` | `timestamp` default `now()` | |
 
-### Row-Level Security (RLS) ポリシ
-
 ```sql
--- threads
-create policy "owner full access"
-  on threads for all
-  using  (auth.jwt()->>'userId' = user_id);
+create table messages (
+  id uuid primary key default gen_random_uuid(),
+  thread_id uuid not null references threads(id) on delete cascade,
+  user_id uuid not null,
+  role text check (role in ('user', 'ai')),
+  content text not null,
+  created_at timestamp default now()
+);
 
-create policy "public read shared"
-  on threads for select
-  using  (is_shared);
+alter table "messages" enable row level security;
 
--- messages
-create policy "owner full access"
-  on messages for all
-  using (
-    thread_id in (
-      select id from threads
-      where user_id = auth.jwt()->>'userId'
-    )
-  );
+create policy "Users can view messages in their own or shared threads"
+on messages for select
+using (
+  exists (
+    select 1 from threads
+    where threads.id = messages.thread_id
+      and (
+        threads.user_id = auth.uid()
+      )
+  )
+);
 
-create policy "public read shared"
-  on messages for select
-  using (
-    thread_id in (
-      select id from threads
-      where is_shared
-    )
-  );
+create policy "Anyone can view messages in shared threads"
+on messages for select
+to authenticated, anon
+using (
+  exists(
+    select 1 from threads
+    where threads.id = messages.thread_id
+      and (
+        threads.is_shared = true
+      )
+  )
+);
+
+create policy "Users can insert messages in their own threads"
+on messages for insert
+with check (
+  user_id = auth.uid() and
+  exists (
+    select 1 from threads
+    where threads.id = messages.thread_id
+      and threads.user_id = auth.uid()
+  )
+);
 ```
 
 ### エンドポイント ＆ 画面仕様
@@ -132,41 +209,4 @@ NEXT_PUBLIC_SUPABASE_URL=…
 NEXT_PUBLIC_SUPABASE_ANON_KEY=…
 
 SUPABASE_JWT_SECRET=<Supabase API > Settings > JWT secret>
-```
-
-### 実装メモ
-
-1. Auth.js 設定
-```ts
-// pages/api/auth/[...auth0].ts
-import { handleAuth, handleCallback } from '@auth0/nextjs-auth0';
-import jwt from 'jsonwebtoken';
-
-const afterCallback = (_req, _res, session) => {
-  const payload = { userId: session.user.sub, exp: Math.floor(Date.now()/1000)+60*60 };
-  session.user.accessToken = jwt.sign(payload, process.env.SUPABASE_JWT_SECRET!);
-  return session;
-};
-export default handleAuth({ callback: handleCallback({ afterCallback }) });
-```
-
-2. Supabase クライアントヘルパ
-```ts
-// lib/supabaseClient.ts
-import { createClient } from '@supabase/supabase-js';
-export const getSupabase = (token?: string) =>
-  createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    token ? { global:{ headers:{ Authorization:`Bearer ${token}` }}} : {}
-  );
-```
-
-3. 共有リンクの生成
-```sql
--- POST /api/threads/share
-update threads
-  set is_shared = true
-  where id = :thread_id and user_id = auth.jwt()->>'userId';
--- 返値: `${origin}/chat?share=${thread_id}`
 ```

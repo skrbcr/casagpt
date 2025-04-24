@@ -1,11 +1,12 @@
-import { auth } from "@/auth";
+import { createClient } from "@/utils/supabase/server";
 import HomeClient from "./home-client";
 import Main from "@/components/main";
 
 export default async function Home() {
-  // Check if the user is authenticated
-  const session = await auth();
-  if (!session?.user) {
+  const supabase = await createClient();
+  const { data: authData } = await supabase.auth.getUser();
+
+  if (!authData?.user) {
     return (
       <Main>
         <div className="flex items-center justify-center h-full">
