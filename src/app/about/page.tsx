@@ -7,7 +7,7 @@ export default function About() {
         <section>
           <h2 className="text-2xl font-bold mb-4">About</h2>
           <p>
-            <strong>ChatGPT for CASA</strong> is an AI assistant powered by OpenAI's ChatGPT and enhanced with CASA documentation and our <code>analysisUtils</code> library. It uses the <code>o4-mini</code> model, one of OpenAI's state-of-the-art language models.
+            <strong>ChatGPT for CASA</strong> is an AI assistant powered by OpenAI&apos;s ChatGPT and enhanced with CASA documentation and <code>analysisUtils</code> library. It uses the <code>o4-mini</code> model, one of OpenAI&apos;s state-of-the-art language models.
           </p>
         </section>
         <section>
@@ -19,7 +19,13 @@ export default function About() {
         <section>
           <h3 className="text-xl font-semibold mb-2">How to use</h3>
           <p>
-            Simply type your question into the chat interface. For example: "Create a script to automate the continuum imaging." or "What can be used to automatically determine the imsize and cell of tclean?" The tool will return a code snippet and an explanation that you can run in your CASA session.
+            Simply type your question into the chat interface. For example: &quot;Create a script to automate the continuum imaging.&quot; or &quot;What can be used to automatically determine the imsize and cell of tclean?&quot; The tool will return a code snippet and an explanation that you can run in your CASA session.
+          </p>
+        </section>
+        <section>
+          <h3 className="text-xl font-semibold mb-2">Notification</h3>
+          <p>
+            The conversation history is not saved, so <strong>if you refresh the page or move to another page, the conversation will be lost</strong>. Sorry for the inconvenience, but please remind this point.
           </p>
         </section>
         <section>
