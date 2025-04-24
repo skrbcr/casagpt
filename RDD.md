@@ -11,3 +11,165 @@
   - shadcn/ui
 - API
   - OpenAI API
+- Authorization
+  - Auth.js
+  - Auth0
+- Database
+  - Supabase
+
+## 会話履歴機能
+
+### ユーザ種別
+
+#### ログインユーザ
+
+- オーナーにより Supabase 上で作成されたアカウント
+- 認証後に自身の会話（`threads`）を作成・編集・共有可能
+
+#### 全ユーザ
+
+- アカウントの有無に関わらずアクセス可能
+- 共有された会話（`is_shared = true`）に限り、読み取り専用で閲覧可能
+
+---
+
+### 認証・認可フロー
+
+| ステップ | 処理 | トークン | 備考 |
+| ---- | ---- | ---- | ---- |
+| 1 | ユーザは Auth0 でログイン（Auth.js の /api/auth/login） | Auth0 ID ／ Access Token | 既存実装 |
+| 2 | Auth.js afterCallback で Auth0 の `id_token.sub` を取り出し、 Supabase JWT を RS256 → HS256 で再署名 | `session.user.accessToken` に保存 | Supabase JWT の署名鍵=`SUPABASE_JWT_SECRET` |
+| 3 | Next.js API ルート／Server Actions から Supabase にアクセスする際、 `createClient(url, anonKey, { global: { headers:{ Authorization: 'Bearer ' + accessToken }}})` で接続 | Supabase は JWT 内 `userId` クレームで本人確認 |
+| 4 | RLS が JWT の `userId` を基に 行レベル判定 | ― | 共有閲覧は anon ロール（トークン無し）データ構造 |
+
+
+#### テーブル：`account`
+
+| `名前`         | `型`       | `内容`                          |
+| ---------- | ------- | --------------------------- |
+| `auth0_sub`  | `text` PK | Supabase のユーザー ID（auth.uid） |
+| `email`      | `text`    | メールアドレス                     |
+| `created_at` | `timestamp` | default `now()`  |
+
+> Auth0 から Actions または Webhook で `INSERT … ON CONFLICT DO NOTHING` を行う。
+
+#### テーブル：`threads`
+
+| `列` | `型` | `説明` |
+|----|----|-----|
+| `id` | `uuid` PK `gen_random_uuid()` | URL `?c=<id>` で使用 |
+| `user_id` | `text` FK → `accounts.auth0_sub` | スレッド所有者 |
+| `title` | `text` | 任意タイトル |
+| `is_shared` | `boolean` default `false` | 共有フラグ |
+| `created_at` | `timestamp` default `now()` | |
+
+#### テーブル：`messages`
+
+| `列` | `型` | `説明` |
+|----|----|-----|
+| `id` | `uuid` PK | |
+| `thread_id` | `uuid` FK → `threads.id` | |
+| `role` | `text` CHECK (`role IN ('user','ai')`) | |
+| `content` | `text` | メッセージ本文 |
+| `created_at` | `timestamp` default `now()` | |
+
+### Row-Level Security (RLS) ポリシ
+
+```sql
+-- threads
+create policy "owner full access"
+  on threads for all
+  using  (auth.jwt()->>'userId' = user_id);
+
+create policy "public read shared"
+  on threads for select
+  using  (is_shared);
+
+-- messages
+create policy "owner full access"
+  on messages for all
+  using (
+    thread_id in (
+      select id from threads
+      where user_id = auth.jwt()->>'userId'
+    )
+  );
+
+create policy "public read shared"
+  on messages for select
+  using (
+    thread_id in (
+      select id from threads
+      where is_shared
+    )
+  );
+```
+
+### エンドポイント ＆ 画面仕様
+
+#### URL | アクセス条件 | 動作
+
+- `/chat?c=<uuid>` | ログイン必須 | スレッド読み書き
+- `/chat?share=<uuid>` | 全ユーザ | 読み取りのみ（入力 UI は disabled）
+
+#### API 例
+
+```http
+POST /api/threads         // 新規スレッド作成
+POST /api/messages        // 書込み
+GET  /api/messages?cid=   // 既読取得
+POST /api/threads/share   // is_shared を true にして共有 URL 生成
+```
+
+---
+
+### .env 設定（抜粋）
+
+```env
+AUTH0_CLIENT_ID=…
+AUTH0_CLIENT_SECRET=…
+AUTH0_ISSUER_BASE_URL=https://<tenant>.auth0.com
+AUTH0_SECRET=any-random-string
+
+NEXT_PUBLIC_SUPABASE_URL=…
+NEXT_PUBLIC_SUPABASE_ANON_KEY=…
+
+SUPABASE_JWT_SECRET=<Supabase API > Settings > JWT secret>
+```
+
+### 実装メモ
+
+1. Auth.js 設定
+```ts
+// pages/api/auth/[...auth0].ts
+import { handleAuth, handleCallback } from '@auth0/nextjs-auth0';
+import jwt from 'jsonwebtoken';
+
+const afterCallback = (_req, _res, session) => {
+  const payload = { userId: session.user.sub, exp: Math.floor(Date.now()/1000)+60*60 };
+  session.user.accessToken = jwt.sign(payload, process.env.SUPABASE_JWT_SECRET!);
+  return session;
+};
+export default handleAuth({ callback: handleCallback({ afterCallback }) });
+```
+
+2. Supabase クライアントヘルパ
+```ts
+// lib/supabaseClient.ts
+import { createClient } from '@supabase/supabase-js';
+export const getSupabase = (token?: string) =>
+  createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    token ? { global:{ headers:{ Authorization:`Bearer ${token}` }}} : {}
+  );
+```
+
+3. 共有リンクの生成
+```sql
+-- POST /api/threads/share
+update threads
+  set is_shared = true
+  where id = :thread_id and user_id = auth.jwt()->>'userId';
+-- 返値: `${origin}/chat?share=${thread_id}`
+```
