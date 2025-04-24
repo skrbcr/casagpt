@@ -1,18 +1,23 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider"
 import { ModeToggle } from "@/components/mode-toggle";
+import { auth } from "@/auth";
+import SignIn from "@/components/sign-in";
+import SignOut from "@/components/sign-out";
 
 export const metadata: Metadata = {
-  title: "CASA GPT",
+  title: "ChatGPT for CASA",
   description: "ChatGPT for CASA",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await auth();
   return (
     <>
       <html lang="en" suppressHydrationWarning>
@@ -26,8 +31,19 @@ export default function RootLayout({
           >
           <div className="flex flex-col h-screen">
             <header className="fixed top-0 left-0 w-full bg-[var(--background)] z-50 py-4 px-6 flex justify-between items-center text-sm shadow-sm">
-              <h1 className="text-2xl font-bold">CASA GPT</h1>
-              <ModeToggle />
+              <h1 className="text-2xl font-bold">
+                <Link href="/">
+                  ChatGPT for CASA
+                </Link>
+              </h1>
+              <div className="flex items-center gap-2">
+                {session?.user ? (
+                  <SignOut />
+                ) : (
+                  <SignIn />
+                )}
+                <ModeToggle />
+              </div>
             </header>
 
             {children}
