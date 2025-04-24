@@ -29,8 +29,8 @@ export function ChatInput({
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder={disabled ? "Please wait..." : "Ask me questions on CASA"}
-        className="flex-grow text-2xl p-2 leading-tight resize-none max-h-100 overflow-y-auto"
+        placeholder={disabled ? "Please wait..." : "Ask me anything about CASA."}
+        className="flex-grow p-2 leading-tight resize-none max-h-100 overflow-y-auto"
         disabled={disabled}
       />
       <Button
