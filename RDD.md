@@ -11,10 +11,7 @@
   - shadcn/ui
 - API
   - OpenAI API
-- Authorization
-  - Auth.js
-  - Auth0
-- Database
+- Backend
   - Supabase
 
 ## 会話履歴機能
@@ -43,11 +40,11 @@
 | 4 | RLS が JWT の `userId` を基に 行レベル判定 | ― | 共有閲覧は anon ロール（トークン無し）データ構造 |
 
 
-#### テーブル：`account`
+#### テーブル：`users`
 
 | `名前`         | `型`       | `内容`                          |
 | ---------- | ------- | --------------------------- |
-| `auth0_sub`  | `text` PK | Supabase のユーザー ID（auth.uid） |
+| `id`  | `uuid` | Supabase のユーザー ID（auth.uid） |
 | `email`      | `text`    | メールアドレス                     |
 | `created_at` | `timestamp` | default `now()`  |
 
