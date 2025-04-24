@@ -37,6 +37,9 @@ export default async function RootLayout({
                 </Link>
               </h1>
               <div className="flex items-center gap-2">
+                <div className="mx-4">
+                  <Link href="/about" className="text-base hover:underline">About</Link>
+                </div>
                 {session?.user ? (
                   <SignOut />
                 ) : (
