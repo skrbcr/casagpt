@@ -1,6 +1,5 @@
 import { type EmailOtpType } from '@supabase/supabase-js'
-import { type NextRequest } from 'next/server'
-
+import { type NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 
@@ -17,13 +16,13 @@ export async function GET(request: NextRequest) {
       type,
       token_hash,
     })
+
     if (!error) {
-      // redirect user to specified redirect URL or root of app
-      redirect(next)
+      redirect(next) // ✅ サーバーリダイレクト（即 return される）
     }
-    return { error: error.message }
+
+    return NextResponse.json({ error: error.message }, { status: 400 }) // ✅ 正常な返り値
   }
 
-  // redirect the user to an error page with some instructions
-  return { error: 'Invalid token or type' }
+  return NextResponse.json({ error: 'Invalid token or type' }, { status: 400 }) // ✅ 正常な返り値
 }
