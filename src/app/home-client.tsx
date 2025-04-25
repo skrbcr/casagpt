@@ -1,12 +1,14 @@
 "use client";
+import useSWR from "swr";
 import { useState } from "react";
 import { ChatInput } from "@/components/chat-input";
 import { ChatMessage } from "@/components/chat-message";
-import Main from "@/components/main";
 import { parseMarkdown } from "@/lib/parseMarkdown";
 import 'katex/dist/katex.min.css';
 import 'prism-themes/themes/prism-vsc-dark-plus.css';
+import Main from "@/components/main";
 import { AppSidebar } from "@/components/app-sidebar";
+import { type Thread } from "@/types/thread";
 
 export default function HomeClient() {
   const [messages, setMessages] = useState<
@@ -51,10 +53,22 @@ export default function HomeClient() {
     }
   };
 
+  const fetcher = (url: string) => fetch(url).then((res) => res.json());
+  const { data: threadsRaw, error } = useSWR("/api/threads", fetcher);
+
+  const threads: Thread[] = threadsRaw ?? [];
+  let threads_message: string | undefined;
+  if (!threadsRaw && !error) {
+    threads_message = "Loading threads...";
+  }
+  if (error) {
+    threads_message = "Failed to load threads";
+  }
+
   return (
     <Main>
       <div className="flex flex-1 overflow-hidden">
-        <AppSidebar chatThreads={[{id: '1', title: 'aaa'}]} />
+        <AppSidebar chatThreads={threads} message={threads_message} />
         <div className="flex flex-col flex-1 min-h-0">
           <div className="flex-1 overflow-y-auto space-y-2 p-4">
             <div className="max-w-screen-lg mx-auto">

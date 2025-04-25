@@ -20,5 +20,7 @@ export default async function Home() {
     );
   }
 
-  return <HomeClient />;
+  return (
+    <HomeClient />
+  );
 }

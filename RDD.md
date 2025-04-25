@@ -46,41 +46,38 @@
 
 | `列` | `型` | `説明` |
 |----|----|-----|
-| `id` | `uuid` | |
-| `user_id` | `uuid` | Supabase の `auth.users` テーブルの ID |
+| `id` | `uuid` | Supabase の `auth.users` テーブルの ID|
 | `email` | `text` | ユーザのメールアドレス |
 | `created_at` | `timestamp` default `now()` | |
 
 ```sql
 create table profiles (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users,
+  id uuid primary key references auth.users,
   email text not null,
   created_at timestamp default now()
 );
 
 alter table profiles enable row level security;
-alter table profiles add constraint unique_user_id unique(user_id);
 
 create policy "Users can view their own profiles"
 on profiles for select
-using ( (select auth.uid()) = user_id );
+using ( (select auth.uid()) = id );
 
 create policy "Users can create a profile."
 on profiles for insert
 to authenticated
-with check ( (select auth.uid()) = user_id );
+with check ( (select auth.uid()) = id );
 
 create policy "Users can update their own profile."
 on profiles for update
 to authenticated
 using ( (select auth.uid()) = user_id )
-with check ( (select auth.uid()) = user_id );
+with check ( (select auth.uid()) = id );
 
 create policy "Users can delete their own profile."
 on profiles for delete
 to authenticated
-using ( (select auth.uid()) = user_id );
+using ( (select auth.uid()) = id );
 ```
 
 #### テーブル：`threads`
@@ -91,7 +88,8 @@ using ( (select auth.uid()) = user_id );
 | `user_id` | `uuid` | スレッドを作成したユーザの ID |
 | `title` | `text` | ユーザが入力したタイトル |
 | `is_shared` | `bool` default `false` | 共有フラグ |
-| `created_at` | `timestamp` default `now()` | |
+| `created_at` | `timestamp` default `now()` | 最初の message が作成された時刻 |
+| `updated_at` | `timestamp` default `now()` | 最新の message が作成された時刻 |
 
 ```sql
 create table threads (
@@ -100,6 +98,7 @@ create table threads (
   title text not null,
   is_shared boolean not null default false,
   created_at timestamp default now()
+  updated_at timestamp default now()
 );
 
 alter table "threads" enable row level security;
@@ -181,32 +180,38 @@ with check (
 
 ### エンドポイント ＆ 画面仕様
 
-#### URL | アクセス条件 | 動作
+#### URL
 
-- `/chat?c=<uuid>` | ログイン必須 | スレッド読み書き
-- `/chat?share=<uuid>` | 全ユーザ | 読み取りのみ（入力 UI は disabled）
+| URL | アクセス条件 | 動作
+| ---- | ---- | ---- |
+| `/?c=<uuid>` | ログイン必須 | スレッド読み書き |
+| `/?share=<uuid>` | 全ユーザ | 読み取りのみ（入力 UI は disabled） |
 
 #### API 例
 
 ```http
 POST /api/threads         // 新規スレッド作成
+GET  /api/threads         // スレッド一覧取得
 POST /api/messages        // 書込み
 GET  /api/messages?cid=   // 既読取得
 POST /api/threads/share   // is_shared を true にして共有 URL 生成
 ```
 
----
+#### 画面遷移
 
-### .env 設定（抜粋）
-
-```env
-AUTH0_CLIENT_ID=…
-AUTH0_CLIENT_SECRET=…
-AUTH0_ISSUER_BASE_URL=https://<tenant>.auth0.com
-AUTH0_SECRET=any-random-string
-
-NEXT_PUBLIC_SUPABASE_URL=…
-NEXT_PUBLIC_SUPABASE_ANON_KEY=…
-
-SUPABASE_JWT_SECRET=<Supabase API > Settings > JWT secret>
-```
+- `/` 画面
+    - サイドバーにスレッド一覧
+    - メインは新規スレッド画面
+    - サイドバーよりスレッド選択で `/?c=<uuid>` に遷移
+    - メッセージ送信で、新しい thread を作成。`title` は `Untitled` とする
+    - サイドバーよりスレッドを削除可能
+- `/?c=<uuid>` 画面
+    - `messages` より、thread に属する messages を取得。`messages.created_at` で昇順にソート
+    - `messages.content` をメインに表示
+    - メッセージ送信で、`POST /api/messages` に `thread_id` を指定して書き込み
+    - サイドバーで自身のスレッドが削除された場合は `/` へ遷移
+- `/?share=<uuid>`
+    - 全ユーザがアクセス可能
+    - `messages` より、thread に属する messages を取得。`messages.created_at` で昇順にソート
+    - `messages.content` をメインに表示
+    - `<ChatInput />` は全ユーザに対して disabled
