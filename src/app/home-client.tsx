@@ -6,6 +6,7 @@ import Main from "@/components/main";
 import { parseMarkdown } from "@/lib/parseMarkdown";
 import 'katex/dist/katex.min.css';
 import 'prism-themes/themes/prism-vsc-dark-plus.css';
+import { AppSidebar } from "@/components/app-sidebar";
 
 export default function HomeClient() {
   const [messages, setMessages] = useState<
@@ -52,23 +53,28 @@ export default function HomeClient() {
 
   return (
     <Main>
-      <div className="flex-1 overflow-y-auto space-y-2 p-4">
-        <div className="max-w-screen-lg mx-auto">
-          {messages.map((message, index) => (
-            <ChatMessage
-              key={index}
-              role={message.role}
-              contentHtml={message.contentHtml}
-              raw={message.content}
-            />
-          ))}
-          {isLoading && <ChatMessage role="ai" contentHtml="<p>Thinking...</p>" />}
-        </div>
-      </div>
+      <div className="flex flex-1 overflow-hidden">
+        <AppSidebar chatThreads={[{id: '1', title: 'aaa'}]} />
+        <div className="flex flex-col flex-1 min-h-0">
+          <div className="flex-1 overflow-y-auto space-y-2 p-4">
+            <div className="max-w-screen-lg mx-auto">
+              {messages.map((message, index) => (
+                <ChatMessage
+                  key={index}
+                  role={message.role}
+                  contentHtml={message.contentHtml}
+                  raw={message.content}
+                />
+              ))}
+              {isLoading && <ChatMessage role="ai" contentHtml="<p>Thinking...</p>" />}
+            </div>
+          </div>
 
-      <div className="border-t px-4 py-3 sticky bottom-0 w-full">
-        <div className="max-w-screen-lg mx-auto">
-          <ChatInput onSend={handleSend} disabled={isLoading} />
+          <div className="border-t px-4 py-3 sticky bottom-0 w-full bg-[var(--background)]">
+            <div className="max-w-screen-lg mx-auto">
+              <ChatInput onSend={handleSend} disabled={isLoading} />
+            </div>
+          </div>
         </div>
       </div>
     </Main>
