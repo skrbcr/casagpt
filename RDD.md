@@ -123,6 +123,7 @@ with check ( (select auth.uid()) = user_id );
 | `列` | `型` | `説明` |
 |----|----|-----|
 | `id` | `uuid` PK | |
+| `responses_id` | `text` | Responses の ID |
 | `user_id` | `uuid` | メッセージを作成したユーザの ID |
 | `thread_id` | `uuid` FK → `threads.id` | |
 | `role` | `text` CHECK (`role IN ('user','ai')`) | |
