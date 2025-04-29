@@ -2,13 +2,9 @@ import { createClient } from "@/utils/supabase/server";
 import HomeClient from "./home-client";
 import Main from "@/components/main";
 
-interface HomePageProps {
-  searchParams: { c?: string; share?: string };
-}
-
-export default async function Home(props: HomePageProps) {
+export default async function Home({ searchParams }: { searchParams: Promise<{c?: string; share?: string }>}) {
   // searchParams must be awaited before use
-  const { c, share } = await props.searchParams;
+  const { c, share } = await searchParams;
   const supabase = await createClient();
   const { data: authData } = await supabase.auth.getUser();
 

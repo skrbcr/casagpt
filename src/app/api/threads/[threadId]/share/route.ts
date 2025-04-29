@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createAnonClient } from "@/utils/supabase/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { createClient } from "@/utils/supabase/server";
 
 /**
  * PATCH /api/threads/:threadId/share
@@ -8,13 +7,16 @@ import { createClient as createAdminClient } from "@supabase/supabase-js";
  */
 export async function PATCH(
   req: NextRequest,
-  context: { params: { threadId: string } },
+  { params }: { params: Promise<{ threadId: string }> },
 ) {
-  // Await params for dynamic route
-  const { threadId } = await context.params;
-  // Authenticate user via anon client
-  const anon = await createAnonClient();
-  const { data: authData } = await anon.auth.getUser();
+  // Await dynamic params and extract threadId
+  const raw = (await params).threadId;
+  if (typeof raw !== 'string') {
+    return NextResponse.json({ error: 'Bad request' }, { status: 400 });
+  }
+  const threadId = raw;
+  const supabase = await createClient();
+  const { data: authData } = await supabase.auth.getUser();
 
   if (!authData?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -24,16 +26,7 @@ export async function PATCH(
   const is_shared = Boolean(body.is_shared);
 
   // Update share flag with service role (bypass RLS)
-  const svcKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!svcKey) {
-    console.error('Service role key not configured');
-    return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 });
-  }
-  const admin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    svcKey
-  );
-  const { data: thread, error } = await admin
+  const { data: thread, error } = await supabase
     .from('threads')
     .update({ is_shared })
     .eq('id', threadId)

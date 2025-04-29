@@ -1,28 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createAnonClient } from "@/utils/supabase/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { createClient } from "@/utils/supabase/server";
 
 /**
  * DELETE /api/threads/:threadId
  * Delete a thread (and its messages via cascade).
  */
 export async function DELETE(
-  _req: NextRequest,
-  context: { params: { threadId: string } },
+  req: NextRequest,
+  { params }: { params: Promise<{ threadId: string }> },                                                                                                                                               
 ) {
-  // Await params for dynamic route
-  const { threadId } = await context.params;
+  // Await dynamic params and extract threadId
+  const raw = (await params).threadId;
+  if (typeof raw !== 'string') {
+    return NextResponse.json({ error: 'Bad request' }, { status: 400 });
+  }
+  const threadId = raw;
 
   // Authenticate user
-  const anon = await createAnonClient();
-  const { data: authData } = await anon.auth.getUser();
+  const supabase = await createClient();
+  const { data: authData } = await supabase.auth.getUser();
 
   if (!authData?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   // Verify ownership
-  const { data: threadRow, error: ownerError } = await anon
+  const { data: threadRow, error: ownerError } = await supabase
     .from("threads")
     .select("user_id")
     .eq("id", threadId)
@@ -32,19 +35,7 @@ export async function DELETE(
   }
 
   // Use service role to delete thread (bypass RLS)
-  const svcKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!svcKey) {
-    console.error("Environment variable SUPABASE_SERVICE_ROLE_KEY is not configured");
-    return NextResponse.json(
-      { error: "Server misconfiguration: SUPABASE_SERVICE_ROLE_KEY is required" },
-      { status: 500 }
-    );
-  }
-  const admin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    svcKey
-  );
-  const { error: deleteError } = await admin
+  const { error: deleteError } = await supabase
     .from("threads")
     .delete()
     .eq("id", threadId);
@@ -62,18 +53,22 @@ export async function DELETE(
  */
 export async function PATCH(
   req: NextRequest,
-  context: { params: { threadId: string } },
+  { params }: { params: Promise<{ threadId: string }>,  },
 ) {
-  // Await dynamic params before using
-  const { threadId } = await context.params;
+  // Await dynamic params and extract threadId
+  const raw = (await params).threadId;
+  if (typeof raw !== 'string') {
+    return NextResponse.json({ error: 'Bad request' }, { status: 400 });
+  }
+  const threadId = raw;
   // Authenticate user
-  const anon = await createAnonClient();
-  const { data: authData } = await anon.auth.getUser();
+  const supabase = await createClient();
+  const { data: authData } = await supabase.auth.getUser();
   if (!authData?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   // Verify ownership
-  const { data: threadRow, error: ownerError } = await anon
+  const { data: threadRow, error: ownerError } = await supabase
     .from('threads')
     .select('user_id')
     .eq('id', threadId)
@@ -87,19 +82,7 @@ export async function PATCH(
     ? body.title.trim()
     : 'Untitled';
   // Update title using service role
-  const svcKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!svcKey) {
-    console.error('Environment variable SUPABASE_SERVICE_ROLE_KEY is not configured');
-    return NextResponse.json(
-      { error: 'Server misconfiguration: SUPABASE_SERVICE_ROLE_KEY is required' },
-      { status: 500 }
-    );
-  }
-  const admin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    svcKey
-  );
-  const { error: updateError } = await admin
+  const { error: updateError } = await supabase
     .from('threads')
     .update({ title })
     .eq('id', threadId);
