@@ -10,8 +10,8 @@ export async function DELETE(
   _req: NextRequest,
   context: { params: { threadId: string } },
 ) {
-  const { params } = context;
-  const { threadId } = params;
+  // Await params for dynamic route
+  const { threadId } = await context.params;
 
   // Authenticate user
   const anon = await createAnonClient();
