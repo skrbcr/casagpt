@@ -2,11 +2,17 @@ import { createClient } from "@/utils/supabase/server";
 import HomeClient from "./home-client";
 import Main from "@/components/main";
 
-export default async function Home() {
+interface HomePageProps {
+  searchParams: { c?: string; share?: string };
+}
+
+export default async function Home(props: HomePageProps) {
+  const { c, share } = props.searchParams;
   const supabase = await createClient();
   const { data: authData } = await supabase.auth.getUser();
 
-  if (!authData?.user) {
+  // If not shared view and not authenticated, prompt login
+  if (!share && !authData?.user) {
     return (
       <Main>
         <div className="flex items-center justify-center h-full">
@@ -21,6 +27,6 @@ export default async function Home() {
   }
 
   return (
-    <HomeClient />
+    <HomeClient initialThreadId={c ?? share} shareMode={Boolean(share)} />
   );
 }
