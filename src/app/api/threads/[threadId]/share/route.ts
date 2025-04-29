@@ -10,8 +10,8 @@ export async function PATCH(
   req: NextRequest,
   context: { params: { threadId: string } },
 ) {
-  const { params } = context;
-  const { threadId } = params;
+  // Await params for dynamic route
+  const { threadId } = await context.params;
   // Authenticate user via anon client
   const anon = await createAnonClient();
   const { data: authData } = await anon.auth.getUser();
@@ -19,13 +19,10 @@ export async function PATCH(
   if (!authData?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-
+  // Parse request body
   const body = await req.json();
   const is_shared = Boolean(body.is_shared);
 
-  // Request body
-  const body = await req.json();
-  const is_shared = Boolean(body.is_shared);
   // Update share flag with service role (bypass RLS)
   const svcKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!svcKey) {

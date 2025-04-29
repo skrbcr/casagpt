@@ -7,7 +7,8 @@ interface HomePageProps {
 }
 
 export default async function Home(props: HomePageProps) {
-  const { c, share } = props.searchParams;
+  // searchParams must be awaited before use
+  const { c, share } = await props.searchParams;
   const supabase = await createClient();
   const { data: authData } = await supabase.auth.getUser();
 
