@@ -14,6 +14,8 @@ import { useSearchParams, useRouter } from 'next/navigation';
 interface HomeClientProps {
   initialThreadId?: string;
   shareMode?: boolean;
+  initialThreadTitle?: string;
+  initialIsShared?: boolean;
 }
 
 type Message = {
@@ -26,26 +28,41 @@ type Message = {
   contentHtml?: string;
 };
 
-export default function HomeClient({ initialThreadId, shareMode = false }: HomeClientProps) {
+export default function HomeClient({
+  initialThreadId,
+  shareMode = false,
+  initialThreadTitle,
+  initialIsShared = false,
+}: HomeClientProps) {
+  // thread state
   const searchParams = useSearchParams();
   const router = useRouter();
   // Determine threadId: either c= or share=
   const cParam = searchParams.get('c');
   const shareParam = searchParams.get('share');
   const threadId = cParam ?? shareParam ?? initialThreadId;
-  const isShare = shareMode;
+  const isShareMode = shareMode;
+  // local shared state (updated after sharing)
+  const [isSharedState, setIsSharedState] = useState<boolean>(initialIsShared);
+  // title state
+  const [threadTitle, setThreadTitle] = useState<string | undefined>(initialThreadTitle);
   const [messages, setMessages] = useState<Message[]>([]);
+  // Sync title/share state when initial props change (e.g., navigating to another thread)
+  useEffect(() => {
+    setThreadTitle(initialThreadTitle);
+    setIsSharedState(initialIsShared);
+  }, [initialThreadTitle, initialIsShared]);
   const [isLoading, setIsLoading] = useState(false);
   const [previousResponseId, setPreviousResponseId] = useState<string | null>(null);
 
 
   const fetcher = (url: string) => fetch(url).then((res) => res.json());
   // Fetch threads when not in shared-only view
-  const { data: threadsRaw, error: threadsError } = useSWR(!isShare ? '/api/threads' : null, fetcher);
+  const { data: threadsRaw, error: threadsError } = useSWR(!isShareMode ? '/api/threads' : null, fetcher);
 
   const threads: Thread[] = threadsRaw ?? [];
   let threadsMessage: string | undefined;
-  if (!threadsRaw && !threadsError && !isShare) {
+  if (!threadsRaw && !threadsError && !isShareMode) {
     threadsMessage = 'Loading threads...';
   }
   if (threadsError) {
@@ -104,6 +121,8 @@ export default function HomeClient({ initialThreadId, shareMode = false }: HomeC
     });
     const data = await res.json();
     if (res.ok) {
+      // mark as shared in UI
+      setIsSharedState(true);
       try {
         await navigator.clipboard.writeText(window.location.origin + data.share_url);
         alert('Copied share URL to clipboard');
@@ -117,7 +136,7 @@ export default function HomeClient({ initialThreadId, shareMode = false }: HomeC
 
   // Send message handler
   const handleSend = async (input: string) => {
-    if (!input.trim() || isLoading || isShare) return;
+    if (!input.trim() || isLoading || isShareMode) return;
     setIsLoading(true);
     let currentThreadId = threadId;
     // Create a new thread if none selected
@@ -172,18 +191,24 @@ export default function HomeClient({ initialThreadId, shareMode = false }: HomeC
   return (
     <Main>
       <div className="flex flex-1 overflow-hidden">
-        {!isShare && (
+        {!isShareMode && (
           <AppSidebar chatThreads={threads} message={threadsMessage} onDelete={handleDelete} />
         )}
         <div className="flex flex-col flex-1 min-h-0">
           <div className="p-4 flex items-center justify-between bg-[var(--background)] border-b">
             <h2 className="text-lg font-semibold">
-              {threadId ? 'Conversation' : 'New Conversation'}
+              {threadTitle ?? (threadId ? 'Conversation' : 'New Conversation')}
             </h2>
-            {!isShare && threadId && (
-              <button onClick={handleShare} className="text-sm text-blue-500 hover:underline">
-                Share
-              </button>
+            {threadId && (
+              isSharedState || isShareMode ? (
+                <span className="text-sm italic">This thread is shared.</span>
+              ) : (
+                <button onClick={async () => {
+                  await handleShare();
+                }} className="text-sm text-blue-500 hover:underline">
+                  Share
+                </button>
+              )
             )}
           </div>
           <div className="flex-1 overflow-y-auto space-y-2 p-4">
@@ -201,7 +226,7 @@ export default function HomeClient({ initialThreadId, shareMode = false }: HomeC
           </div>
           <div className="border-t px-4 py-3 sticky bottom-0 w-full bg-[var(--background)]">
             <div className="max-w-screen-lg mx-auto">
-              <ChatInput onSend={handleSend} disabled={isLoading || isShare} />
+              <ChatInput onSend={handleSend} disabled={isLoading || isShareMode} />
             </div>
           </div>
         </div>

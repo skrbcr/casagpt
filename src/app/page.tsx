@@ -27,7 +27,27 @@ export default async function Home(props: HomePageProps) {
     );
   }
 
+  // Fetch thread title and shared status if a threadId is provided
+  let initialThreadTitle: string | undefined;
+  let initialIsShared = false;
+  const threadId = c ?? share;
+  if (threadId) {
+    const { data: threadData, error: threadError } = await supabase
+      .from('threads')
+      .select('title, is_shared')
+      .eq('id', threadId)
+      .single();
+    if (!threadError && threadData) {
+      initialThreadTitle = threadData.title;
+      initialIsShared = threadData.is_shared;
+    }
+  }
   return (
-    <HomeClient initialThreadId={c ?? share} shareMode={Boolean(share)} />
+    <HomeClient
+      initialThreadId={threadId}
+      shareMode={Boolean(share)}
+      initialThreadTitle={initialThreadTitle}
+      initialIsShared={initialIsShared}
+    />
   );
 }
