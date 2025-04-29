@@ -110,6 +110,24 @@ export default function HomeClient({
       console.error('Failed to delete thread');
     }
   };
+  // Rename thread handler
+  const handleRename = async (id: string, currentTitle: string) => {
+    const newTitle = prompt('Enter new thread title:', currentTitle);
+    if (newTitle === null) return;
+    const titleTrimmed = newTitle.trim();
+    if (!titleTrimmed) return;
+    const res = await fetch(`/api/threads/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: titleTrimmed }),
+    });
+    if (res.ok) {
+      mutate('/api/threads');
+      if (threadId === id) setThreadTitle(titleTrimmed);
+    } else {
+      console.error('Failed to rename thread');
+    }
+  };
 
   // Share thread handler
   const handleShare = async () => {
@@ -192,7 +210,7 @@ export default function HomeClient({
     <Main>
       <div className="flex flex-1 overflow-hidden">
         {!isShareMode && (
-          <AppSidebar chatThreads={threads} message={threadsMessage} onDelete={handleDelete} />
+          <AppSidebar chatThreads={threads} message={threadsMessage} onDelete={handleDelete} onRename={handleRename} />
         )}
         <div className="flex flex-col flex-1 min-h-0">
           <div className="p-4 flex items-center justify-between bg-[var(--background)] border-b">

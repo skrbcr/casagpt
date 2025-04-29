@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { type Thread } from "@/types/thread";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { MoreVertical, Pencil, Trash } from "lucide-react";
 
-export function AppSidebar({ chatThreads, message, onDelete }: { chatThreads: Thread[]; message?: string; onDelete?: (id: string) => void }) {
+export function AppSidebar({ chatThreads, message, onDelete, onRename }: { chatThreads: Thread[]; message?: string; onDelete?: (id: string) => void; onRename?: (id: string, title: string) => void }) {
   return (
     <div className="flex h-full">
       <aside className="w-64 border-r bg-muted p-4">
@@ -24,13 +26,28 @@ export function AppSidebar({ chatThreads, message, onDelete }: { chatThreads: Th
                   >
                     {thread.title}
                   </Link>
-                  {onDelete && (
-                    <button
-                      onClick={() => onDelete(thread.id)}
-                      className="ml-2 text-red-500 hover:text-red-700"
-                    >
-                      ×
-                    </button>
+                  {(onDelete || onRename) && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="ml-2 text-muted-foreground hover:text-foreground">
+                          <MoreVertical className="size-4" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent sideOffset={4} align="start">
+                        {onRename && (
+                          <DropdownMenuItem inset onClick={() => onRename(thread.id, thread.title)}>
+                            <Pencil className="size-4" />
+                            Rename title
+                          </DropdownMenuItem>
+                        )}
+                        {onDelete && (
+                          <DropdownMenuItem inset variant="destructive" onClick={() => onDelete(thread.id)}>
+                            <Trash className="size-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
                 </div>
               ))
