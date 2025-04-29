@@ -64,7 +64,8 @@ export async function PATCH(
   req: NextRequest,
   context: { params: { threadId: string } },
 ) {
-  const { threadId } = context.params;
+  // Await dynamic params before using
+  const { threadId } = await context.params;
   // Authenticate user
   const anon = await createAnonClient();
   const { data: authData } = await anon.auth.getUser();

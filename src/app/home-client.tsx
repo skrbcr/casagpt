@@ -166,7 +166,14 @@ export default function HomeClient({
       });
       const data = await res.json();
       if (res.ok) {
+        // Optimistically update the threads list in the sidebar
+        mutate('/api/threads', (threads: Thread[] = []) => [
+          { id: data.id, title: data.title, is_shared: data.is_shared, created_at: data.created_at, updated_at: data.updated_at },
+          ...threads,
+        ], false);
+        // Set current thread and navigate
         currentThreadId = data.id;
+        setThreadTitle(data.title);
         router.push(`/?c=${currentThreadId}`);
       } else {
         console.error('Failed to create thread', data.error);
@@ -219,7 +226,11 @@ export default function HomeClient({
             </h2>
             {threadId && (
               isSharedState || isShareMode ? (
-                <span className="text-sm italic">This thread is shared.</span>
+                <button onClick={async () => {
+                  await handleShare();
+                }} className="text-sm text-blue-500 hover:underline">
+                  <span className="text-sm italic">This thread is shared.</span>
+                </button>
               ) : (
                 <button onClick={async () => {
                   await handleShare();
