@@ -1,10 +1,9 @@
 import type { Metadata } from 'next'
-import { login } from '@/lib/auth-actions'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 
 import Main from '@/components/main'
-import AuthForm from '@/components/auth-form'
+import LoginForm from '@/components/login-form'
 
 export const metadata: Metadata = {
   title: 'Login',
@@ -22,7 +21,7 @@ export default async function LoginPage() {
   return (
     <Main>
       <div className='flex flex-col items-center justify-center h-screen'>
-        <AuthForm title='Login' formAction={login}/>
+        <LoginForm />
       </div>
     </Main>
   )

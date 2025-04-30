@@ -1,17 +1,17 @@
 import type { Metadata } from 'next';
 import Main from '@/components/main';
-import ResetPasswordForm from '@/components/reset-password-form';
+import UpdatePasswordForm from '@/components/update-password-form';
 
 export const metadata: Metadata = {
-  title: 'Reset Password',
-  description: 'Reset your password.',
+  title: 'Update Password',
+  description: 'Set a new password for your account.',
 };
 
-export default function ResetPasswordPage() {
+export default function UpdatePasswordPage() {
   return (
     <Main>
       <div className="flex flex-col items-center justify-center h-screen">
-        <ResetPasswordForm />
+        <UpdatePasswordForm />
       </div>
     </Main>
   );
