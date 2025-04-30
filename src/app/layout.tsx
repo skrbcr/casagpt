@@ -8,7 +8,10 @@ import LogIn from "@/components/log-in";
 import { createClient } from "@/utils/supabase/server";
 
 export const metadata: Metadata = {
-  title: "ChatGPT for CASA",
+  title: {
+    default: "ChatGPT for CASA",
+    template: "%s | ChatGPT for CASA",
+  },
   description: "ChatGPT for CASA",
 };
 

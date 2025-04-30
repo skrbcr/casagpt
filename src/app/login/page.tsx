@@ -1,9 +1,15 @@
+import type { Metadata } from 'next'
 import { login } from '@/lib/auth-actions'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 
 import Main from '@/components/main'
 import AuthForm from '@/components/auth-form'
+
+export const metadata: Metadata = {
+  title: 'Login',
+  description: 'Login to your account.',
+}
 
 export default async function LoginPage() {
   const supabase = await createClient()

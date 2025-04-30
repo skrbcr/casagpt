@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import Main from "@/components/main";
+
+export const metadata: Metadata = {
+  title: "About",
+  description: "About ChatGPT for CASA.",
+};
 
 export default function About() {
   return (
