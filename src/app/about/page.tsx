@@ -14,7 +14,7 @@ export default function About() {
         <section>
           <H2>About</H2>
           <p>
-            <strong>ChatGPT for CASA</strong> is an AI assistant powered by OpenAI&apos;s ChatGPT and enhanced with CASA documentation and <code>analysisUtils</code> library. It uses the <code>o3-mini</code> model, one of OpenAI&apos;s state-of-the-art language models.
+            <strong>ChatGPT for CASA</strong> is an AI assistant powered by OpenAI&apos;s ChatGPT and enhanced with CASA documentation and <code>analysisUtils</code> library. It uses the <code>GPT-4.1</code> model, one of OpenAI&apos;s smart language models.
           </p>
         </section>
         <section>
