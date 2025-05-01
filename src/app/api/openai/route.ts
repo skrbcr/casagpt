@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   const vevctorStoreId = String(process.env.VECTOR_STORE_ID);
   try {
     const response = await openai.responses.create({
-      model: 'o4-mini-2025-04-16',
+      model: 'o3-mini-2025-01-31',
       instructions: systemPrompt,
       input: prompt,
       tools: [{
