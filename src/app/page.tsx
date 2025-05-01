@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import HomeClient from "./home-client";
 import Main from "@/components/main";
@@ -10,6 +11,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{c?
 
   // If not shared view and not authenticated, prompt login
   if (!share && !authData?.user) {
+    if (c) {
+      redirect("/");
+    }
     return (
       <Main>
         <div className="flex items-center justify-center h-full">
@@ -30,13 +34,28 @@ export default async function Home({ searchParams }: { searchParams: Promise<{c?
   if (threadId) {
     const { data: threadData, error: threadError } = await supabase
       .from('threads')
-      .select('title, is_shared')
+      .select('title, is_shared, user_id')
       .eq('id', threadId)
       .single();
     if (!threadError && threadData) {
       initialThreadTitle = threadData.title;
       initialIsShared = threadData.is_shared;
     }
+    if (share && !threadData?.is_shared) {
+      if (!!authData?.user?.id && authData?.user?.id == threadData?.user_id) {
+        redirect(`/?c=${threadId}`);
+      }
+      else {
+        redirect("/");
+      }
+    }
+    if (c && authData?.user && threadData?.user_id !== authData.user.id) {
+      redirect("/");
+    }
+    if (c && !threadData) {
+      redirect("/");
+    }
+
   }
   return (
     <HomeClient
