@@ -41,7 +41,7 @@ export default function About() {
             This web application uses essential cookies required for authentication (provided by Supabase). No optional or tracking cookies are used.
           </p>
           <p>
-            Please be aware that both the maintainer (<strong>Akimasa Nishida</strong>) and OpenAI may access your queries and the AI's responses. Your interactions might also be used to improve the model&apos;s performance by OpenAI.
+            Please be aware that both the maintainer (<strong>Akimasa Nishida</strong>) and OpenAI may access your queries and the AI&apos;s responses. Your interactions might also be used to improve the model&apos;s performance by OpenAI.
           </p>
         </section>
         <section>
