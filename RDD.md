@@ -11,3 +11,294 @@
   - shadcn/ui
 - API
   - OpenAI API
+- Backend
+  - Supabase
+
+## 会話履歴機能
+
+### ユーザ種別
+
+#### ログインユーザ
+
+- オーナーにより Supabase 上で作成されたアカウント
+- メールアドレスとパスワードでログイン
+- 認証後に自身の会話（`threads`）を作成・編集・共有可能
+
+#### 全ユーザ
+
+- アカウントの有無に関わらずアクセス可能
+- 共有された会話（`is_shared = true`）に限り、読み取り専用で閲覧可能
+
+### threads & messages
+
+- threads：一連の会話をまとめたもの
+  - ユーザは作成、削除が可能
+  - account が削除された場合、関連する threads も削除される
+- messages：スレッド内のメッセージ
+  - ユーザは作成が可能
+  - threads が削除された場合、関連する messages も削除される
+
+---
+
+### データベース設計
+
+#### テーブル：`profiles`
+
+| `列`         | `型`                        | `説明`                                 |
+| ------------ | --------------------------- | -------------------------------------- |
+| `id`         | `uuid`                      | Supabase の `auth.users` テーブルの ID |
+| `email`      | `text`                      | ユーザのメールアドレス                 |
+| `created_at` | `timestamp` default `now()` |                                        |
+
+```sql
+create table profiles (
+  id uuid primary key references auth.users,
+  email text not null,
+  created_at timestamp default now()
+);
+
+alter table profiles enable row level security;
+
+create policy "Users can view their own profiles"
+on profiles for select
+using ( (select auth.uid()) = id );
+
+create policy "Users can create a profile."
+on profiles for insert
+to authenticated
+with check ( (select auth.uid()) = id );
+
+create policy "Users can update their own profile."
+on profiles for update
+to authenticated
+using ( (select auth.uid()) = user_id )
+with check ( (select auth.uid()) = id );
+
+create policy "Users can delete their own profile."
+on profiles for delete
+to authenticated
+using ( (select auth.uid()) = id );
+```
+
+#### テーブル：`threads`
+
+| `列`         | `型`                               | `説明`                          |
+| ------------ | ---------------------------------- | ------------------------------- |
+| `id`         | `uuid` default `gen_random_uuid()` | URL `?c=<id>` で使用            |
+| `user_id`    | `uuid`                             | スレッドを作成したユーザの ID   |
+| `title`      | `text`                             | ユーザが入力したタイトル        |
+| `is_shared`  | `bool` default `false`             | 共有フラグ                      |
+| `created_at` | `timestamp` default `now()`        | 最初の message が作成された時刻 |
+| `updated_at` | `timestamp` default `now()`        | 最新の message が作成された時刻 |
+
+```sql
+create table threads (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references profiles(id) on delete cascade,
+  title text not null,
+  is_shared boolean not null default false,
+  created_at timestamp default now()
+  updated_at timestamp default now()
+);
+
+alter table "threads" enable row level security;
+
+create policy "Users can view their own threads"
+on threads for select
+using ( (select auth.uid()) = user_id );
+
+create policy "Anyone can view shared threads"
+on threads for select
+to authenticated, anon
+using ( is_shared = true );
+
+create policy "Users can create a thread"
+on threads for insert
+to authenticated
+with check ( (select auth.uid()) = user_id );
+```
+
+#### テーブル：`messages`
+
+| `列`           | `型`                                   | `説明`                          |
+| -------------- | -------------------------------------- | ------------------------------- |
+| `id`           | `uuid` PK                              |                                 |
+| `responses_id` | `text`                                 | Responses の ID                 |
+| `user_id`      | `uuid`                                 | メッセージを作成したユーザの ID |
+| `thread_id`    | `uuid` FK → `threads.id`               |                                 |
+| `role`         | `text` CHECK (`role IN ('user','ai')`) |                                 |
+| `content`      | `text`                                 | メッセージ本文                  |
+| `created_at`   | `timestamp` default `now()`            |                                 |
+
+```sql
+create table messages (
+  id uuid primary key default gen_random_uuid(),
+  thread_id uuid not null references threads(id) on delete cascade,
+  user_id uuid not null,
+  role text check (role in ('user', 'ai')),
+  content text not null,
+  created_at timestamp default now()
+);
+
+alter table "messages" enable row level security;
+
+create policy "Users can view messages in their own or shared threads"
+on messages for select
+using (
+  exists (
+    select 1 from threads
+    where threads.id = messages.thread_id
+      and (
+        threads.user_id = auth.uid()
+      )
+  )
+);
+
+create policy "Anyone can view messages in shared threads"
+on messages for select
+to authenticated, anon
+using (
+  exists(
+    select 1 from threads
+    where threads.id = messages.thread_id
+      and (
+        threads.is_shared = true
+      )
+  )
+);
+
+create policy "Users can insert messages in their own threads"
+on messages for insert
+with check (
+  user_id = auth.uid() and
+  exists (
+    select 1 from threads
+    where threads.id = messages.thread_id
+      and threads.user_id = auth.uid()
+  )
+);
+```
+
+### エンドポイント ＆ 画面仕様
+
+#### URL
+
+| URL              | アクセス条件 | 動作                                |
+| ---------------- | ------------ | ----------------------------------- |
+| `/?c=<uuid>`     | ログイン必須 | スレッド読み書き                    |
+| `/?share=<uuid>` | 全ユーザ     | 読み取りのみ（入力 UI は disabled） |
+
+#### API
+
+```http
+POST /api/threads         // 新規スレッド作成
+GET  /api/threads         // スレッド一覧取得
+POST /api/messages        // 書込み
+GET  /api/messages?cid=   // 既読取得
+POST /api/threads/share   // is_shared を true にして共有 URL 生成
+```
+
+1. 全体共通事項
+
+- 認証には Supabase の `supabase.auth.getUser()` を利用し、401／403 を返却
+- エラー時は HTTP ステータス＋`{ error: string }` の JSON
+- タイムスタンプや UUID 等は DB 側のデフォルト値を利用
+- DB には既存の RLS ポリシー（profiles, threads, messages）を適用
+
+2. threads API
+
+- GET /api/threads
+  - アクセス条件：認証ユーザ
+  - リクエスト：なし
+  - 処理：自分が作成した全スレッドを updated_at 降順で取得
+  - レスポンス 200：
+    `[ { id, title, is_shared, created_at, updated_at }, … ]`
+- POST /api/threads
+  - アクセス条件：認証ユーザ
+  - リクエスト JSON：
+    `{ title?: string }`
+    ・title 未指定時は "Untitled" をサーバで設定
+  - 処理：新規スレッド作成（user_id←認証ユーザ、その他デフォルト）
+  - レスポンス 201： `{ id, title, is_shared, created_at, updated_at }`
+- DELETE /api/threads/:id
+  - アクセス条件：認証ユーザかつオーナー
+  - 処理：指定スレッドを削除（CASCADE で messages も削除）
+  - レスポンス 204 (No Content)
+- PATCH /api/threads/:id/share
+  - アクセス条件：認証ユーザかつオーナー
+  - リクエスト JSON： `{ is_shared: boolean }`
+  - 処理：is_shared フラグ更新
+  - レスポンス 200： `{ id, is_shared, share_url: "/?share=<id>" }`
+
+3. messages API
+
+- GET /api/messages?thread_id=<uuid>
+  - アクセス条件：
+    - 認証ユーザかつ自分のスレッド
+    - または anon/authenticated かつ対象スレッドが is_shared=true
+  - リクエスト：なし（thread_id はクエリパラメータ）
+  - 処理：指定スレッドの全メッセージを created_at 昇順で取得
+  - レスポンス 200：
+    `[ { id, thread_id, role, content, responses_id?, created_at }, … ]`
+- POST /api/messages
+  - アクセス条件：認証ユーザかつ自分のスレッド
+  - リクエスト JSON：
+    `{ thread_id: string, role: "user"|"ai", content: string, responses_id?: string }`
+  - 処理：
+    1. messages テーブルに挿入
+    2. threads.updated_at を現在時刻に更新
+  - レスポンス 201：挿入されたメッセージオブジェクト
+
+4. フロントエンド（Next.js）連携
+
+- ルーティング
+  - `/?c=<uuid>`：認証ユーザ専用、編集可
+  - `/?share=<uuid>`：全ユーザ可、入力 UI は disabled
+- スレッド一覧（サイドバー）
+  - マウント時に GET /api/threads を呼び出し
+  - 削除アイコン→DELETE /api/threads/:id
+  - クリック時：URL を `/?c=<id>` に更新
+- メッセージ一覧・表示
+  - `c` または `share` パラメータ取得(useSearchParams)
+  - GET /api/messages?thread_id=<id> でフェッチし state に格納
+  - map して ChatMessage コンポーネントに渡す
+- メッセージ送信フロー（新規 or 既存いずれも共通）
+  1. thread_id が未決定（新規）の場合、最初の送信前に POST /api/threads で作成→得られた id を state に保持
+  2. POST /api/messages でユーザ発言を保存
+  3. fetch(`/api/openai`) で AI 応答を取得
+  4. POST /api/messages で AI 応答を保存（role="ai", responses_id=OpenAI 側 ID）
+  5. UI に反映
+- 共有 URL 発行ボタン
+  - オーナーのみ表示
+  - クリックで PATCH /api/threads/:id/share を実行
+  - 返却された share_url をクリップボードにコピー
+
+5. エラー・バリデーション
+
+- リクエスト必須パラメータのチェック（thread_id, content length など）
+- unauthorized／forbidden 時に 401／403
+- 不正な UUID や存在しないリソースは 404
+- サーバ内部エラーは 500
+
+6. （拡張案）
+
+- thread タイトル編集用 PATCH /api/threads/:id (title 更新)
+
+#### 画面遷移
+
+- `/` 画面
+  - サイドバーにスレッド一覧
+  - メインは新規スレッド画面
+  - サイドバーよりスレッド選択で `/?c=<uuid>` に遷移
+  - メッセージ送信で、新しい thread を作成。`title` は `Untitled` とする
+  - サイドバーよりスレッドを削除可能
+- `/?c=<uuid>` 画面
+  - `messages` より、thread に属する messages を取得。`messages.created_at` で昇順にソート
+  - `messages.content` をメインに表示
+  - メッセージ送信で、`POST /api/messages` に `thread_id` を指定して書き込み
+  - サイドバーで自身のスレッドが削除された場合は `/` へ遷移
+- `/?share=<uuid>`
+  - 全ユーザがアクセス可能
+  - `messages` より、thread に属する messages を取得。`messages.created_at` で昇順にソート
+  - `messages.content` をメインに表示
+  - `<ChatInput />` は全ユーザに対して disabled
