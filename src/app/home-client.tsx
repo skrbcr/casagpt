@@ -10,6 +10,7 @@ import Main from "@/components/main";
 import { AppSidebar } from "@/components/app-sidebar";
 import { type Thread } from "@/types/thread";
 import { useSearchParams, useRouter } from 'next/navigation';
+import { Menu } from "lucide-react";
 
 interface HomeClientProps {
   initialThreadId?: string;
@@ -54,6 +55,7 @@ export default function HomeClient({
   }, [initialThreadTitle, initialIsShared]);
   const [isLoading, setIsLoading] = useState(false);
   const [previousResponseId, setPreviousResponseId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
 
   const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -215,15 +217,50 @@ export default function HomeClient({
 
   return (
     <Main>
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 min-w-0 overflow-visible sm:overflow-hidden">
         {!isShareMode && (
-          <AppSidebar chatThreads={threads} message={threadsMessage} onDelete={handleDelete} onRename={handleRename} />
+          <>
+            <div className="hidden sm:flex">
+              <AppSidebar
+                chatThreads={threads}
+                message={threadsMessage}
+                onDelete={handleDelete}
+                onRename={handleRename}
+              />
+            </div>
+            {sidebarOpen && (
+              <div className="fixed inset-0 z-50 flex">
+                <div
+                  className="fixed inset-0 bg-black opacity-50"
+                  onClick={() => setSidebarOpen(false)}
+                />
+                <div className="relative">
+                  <AppSidebar
+                    chatThreads={threads}
+                    message={threadsMessage}
+                    onDelete={handleDelete}
+                    onRename={handleRename}
+                  />
+                </div>
+              </div>
+            )}
+          </>
         )}
-        <div className="flex flex-col flex-1 min-h-0">
+        <div className="flex flex-col flex-1 min-h-0 min-w-0">
           <div className="p-4 flex items-center justify-between bg-[var(--background)] border-b">
-            <h2 className="text-lg font-semibold">
-              {threadTitle ?? (threadId ? 'Conversation' : 'New Conversation')}
-            </h2>
+            <div className="flex items-center">
+              {!isShareMode && (
+                <button
+                  className="mr-2 sm:hidden"
+                  onClick={() => setSidebarOpen(true)}
+                >
+                  <Menu className="w-6 h-6" />
+                </button>
+              )}
+              <h2 className="text-lg font-semibold">
+                {threadTitle ?? (threadId ? 'Conversation' : 'New Conversation')}
+              </h2>
+            </div>
             {threadId && (
               isSharedState || isShareMode ? (
                 <button onClick={async () => {

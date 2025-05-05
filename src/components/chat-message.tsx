@@ -11,7 +11,7 @@ export function ChatMessage({ role, contentHtml, raw }: { role: string; contentH
           </div>
         </div>
       ) : (
-        <Card className="p-4 ml-auto w-fit max-w-[60%]">
+        <Card className="p-4 ml-auto w-fit max-w-[60%] break-words">
           {raw}
         </Card>
       )}

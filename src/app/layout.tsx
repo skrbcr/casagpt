@@ -2,9 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider"
-import { ModeToggle } from "@/components/mode-toggle";
-import LogOut from "@/components/log-out";
-import LogIn from "@/components/log-in";
+import HeaderMenu from "@/components/header-menu";
 import { createClient } from "@/utils/supabase/server";
 
 export const metadata: Metadata = {
@@ -41,17 +39,7 @@ export default async function RootLayout({
                   ChatGPT for CASA
                 </Link>
               </h1>
-              <div className="flex items-center gap-2">
-                <div className="mx-4">
-                  <Link href="/about" className="text-base hover:underline">About</Link>
-                </div>
-                {authData?.user ? (
-                  <LogOut />
-                ) : (
-                  <LogIn />
-                )}
-                <ModeToggle />
-              </div>
+              <HeaderMenu isLoggedIn={Boolean(authData?.user)} />
             </header>
 
             {children}
